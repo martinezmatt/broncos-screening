@@ -1,0 +1,105 @@
+---
+title: "Denver Broncos DSI Screening"
+author: "Matthew Martinez"
+date: "2023-07-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load Packages
+```{r Packages, warning=FALSE, message=FALSE}
+library(tidyverse)
+```
+
+## Loading datasets
+```{r Datasets, message=FALSE}
+owners <- read_csv("owners.csv")
+pets <- read_csv("pets.csv")
+procedure_details <- read_csv("procedure_details.csv")
+procedures <- read_csv("procedures.csv")
+
+# Merged datasets for ease of use
+ownersMergedPets <- inner_join(owners, pets, by="OwnerID")
+procedure_merge_data <- inner_join(procedures, procedure_details, by = c("ProcedureType", "ProcedureSubCode"))
+```
+
+## The oldest dog in Southfield is Crocket
+```{r One}
+ownersMergedPets %>%
+  select(City, Name.y, Kind, Age) %>%
+  filter(City == "Southfield", Kind == "Dog") %>%
+  .[which.max(.$Age), ]
+```
+
+## Mean number of pets per city is 1.1
+```{r Two}
+problem_two <- ownersMergedPets %>%
+  group_by(City) %>%
+  summarize(num_pets = n(), num_owners = n_distinct(OwnerID)) %>%
+  mutate(mean_pets = num_pets / num_owners)
+mean(problem_two$mean_pets)
+```
+
+## Who spent the most? Daniel Fay with a total of 450
+```{r Three}
+pet_cost <- procedure_merge_data %>%
+  group_by(PetID) %>%
+  summarize(total = sum(Price))
+inner_join(pet_cost, ownersMergedPets, by = "PetID") %>%
+  arrange(desc(total)) %>%
+  slice(1) %>%
+  select(Name.x, Surname)
+```
+
+## How many owners spent 20 dollars or more? 13
+```{r Four} 
+pet_cost %>% filter(total >= 20) %>% nrow()
+```
+
+## How many owners have at least two different kinds of pets? 4
+```{r Five}
+ownersMergedPets %>%
+  group_by(OwnerID) %>%
+  summarize(different_kinds = n_distinct(Kind)) %>%
+  filter(different_kinds >= 2) %>%
+  nrow()
+```
+
+## First letter of owner name matches first letter of pets name? 8
+```{r Six}
+ownersMergedPets %>%
+  mutate(FirstLetter = substr(Name.x, 1, 1) == substr(Name.y, 1, 1)) %>%
+  group_by(OwnerID) %>%
+  filter(FirstLetter == TRUE) %>%
+  nrow()
+```
+
+## Percentage of pets that received a vaccination? 29%
+```{r Seven}
+procedures %>% filter(ProcedureType == "VACCINATIONS") %>%
+  nrow(.) / nrow(pets) * 100
+```
+
+## Percentage of cities with more male pets than female pets? 57.5%
+```{r Eight}
+cities_data <- ownersMergedPets %>%
+  group_by(City, Gender) %>%
+  summarize(num_pets = n()) %>%
+  pivot_wider(names_from = Gender, values_from = num_pets, values_fill = 0)
+cities_data %>% filter(male > female) %>%
+  nrow(.) / nrow(cities_data) * 100
+```
+
+## Which city's pet sample is made up of exactly 70% dogs? Grand Rapids
+```{r Nine}
+ownersMergedPets %>% group_by(City, Kind) %>%
+  summarize(num_pets = n()) %>%
+  pivot_wider(names_from = Kind, values_from = num_pets, values_fill = 0) %>%
+  mutate(total = Dog + Parrot + Cat) %>%
+  mutate(percentOfDogs = (Dog / total) * 100) %>%
+  filter(percentOfDogs == 70) %>%
+  select(City)
+```
